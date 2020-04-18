@@ -5,12 +5,18 @@ token <- get_token()
 get_last_tweet_id <- function(){
     get_timeline("AshleysBot2")$status_id[1]
 }
+source("generate_plots.R")
 
-post_tweet(status = "Testing normal tweet @theashleyxavier",
+
+post_tweet(status = paste0("Covid Monitoring for India: ",Sys.Date(), "\n @theashleyxavier"),
            token = token)
 
-post_tweet(status = "Testing media atachment",
-           token = token,
-           in_reply_to_status_id = get_last_tweet_id(),
-           media = "~/Pictures/vlad-tchompalov-NpQSAv29evU-unsplash.jpg")
-
+list.files("plots", full.names = TRUE,
+           pattern = Sys.Date() %>%  as.character()) %>%
+    sapply(function(i){
+        post_tweet(status = gsub("^.*19|.png","",x = i) %>%
+                       gsub("_"," ",x=.) %>% paste0(collapse = ""),
+                   token = token,
+                   media = i,
+                   in_reply_to_status_id = get_last_tweet_id())
+    })
