@@ -99,12 +99,12 @@ ggsave(filename = paste0("plots/",Sys.Date(),"_national_doubling_time.png"),
 
 # Plot on Testing Numbers -----------------------------------------------------------
 
-last_plot <- data_testing  %>%
+last_plot <- data_testing_national  %>%
     melt(id.vars = "date") %>% filter(variable != "new_tests") %>%
     ggplot()+
     geom_histogram(aes(x=date , y= value, fill = variable),
                    stat = "identity") +
-    geom_text(data = data_testing %>%
+    geom_text(data = data_testing_national %>%
                   mutate(percent = round(100*new_positives/new_tests,1)),
               aes(x= date , y = new_tests+ 1000,
                   label = paste0(percent,"%"))) +
@@ -183,5 +183,25 @@ last_plot <- data_india_state %>%
           legend.position = "none")
 
 ggsave(filename = paste0("plots/",Sys.Date(),"_trajectory.png"),
+       plot = last_plot ,
+       height = 9, width = 9)
+
+
+# trajectory of tests  ----------------------------------------------------
+
+last_plot <- data_testing_state %>% group_by(State) %>%
+    filter(min(Positive, na.rm = TRUE) > 100,
+           !is.na(Positive) & !is.na(Negative)) %>%
+    ggplot(aes(x = Negative, y = Positive, color = State, group = State))+
+    # geom_point() +
+    geom_line() +
+    gghighlight(label_key = State,max_highlight = 30,label_params = list(size = 3)) +
+    geom_point() +
+    scale_x_log10() + scale_y_log10() +
+    theme_bw() +
+    theme(legend.position = "bottom")+
+    ggtitle("Trajectory of Positive vs Negative tests")
+
+ggsave(filename = paste0("plots/",Sys.Date(),"_testing_trajectory.png"),
        plot = last_plot ,
        height = 9, width = 9)

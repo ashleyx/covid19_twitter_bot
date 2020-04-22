@@ -37,8 +37,8 @@ data_india_state <- unique(data_india_raw$dateannounced) %>% lapply(function(d){
 
 cat("https://api.covid19india.org/raw_data.json\n")
 # This is the file used for testing numbers  ------------------------------
-
-suppressWarnings(data_testing <- read_json("https://api.covid19india.org/data.json",simplifyVector = TRUE)$tested %>%
+data_testing_raw <- read_json("https://api.covid19india.org/data.json",simplifyVector = TRUE)
+suppressWarnings(data_testing_national <- data_testing_raw $tested %>%
                      transmute(total = as.integer(totalsamplestested),
                                positive = as.integer(totalpositivecases),
                                negative = total - positive,
@@ -51,6 +51,10 @@ suppressWarnings(data_testing <- read_json("https://api.covid19india.org/data.js
                                new_negatives = new_tests - new_positives) %>%
                      filter(date > Sys.Date()-24)
 )
+data_testing_state <- read_csv("https://api.covid19india.org/csv/latest/statewise_tested_numbers_data.csv") %>% 
+    mutate("Updated On" = as.Date(`Updated On`,"%d/%m/%Y")) %>% 
+    filter(`Updated On` > "2020-03-01")
+    
 cat("https://api.covid19india.org/data.json\n")
 # This file is used for semi-log plot -------------------------------------
 
