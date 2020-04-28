@@ -4,7 +4,13 @@ chunk2 <- function(x,n) split(x, cut(seq_along(x), n, labels = FALSE)) # stolen 
 
 sapply( c("magrittr","dplyr","readr","reshape2","skimr","ggplot2","gghighlight","jsonlite","ggtext"),
         function(x){
-            suppressPackageStartupMessages(library(x, character.only = TRUE))
+            if(x %in% rownames(installed.packages())){
+                suppressPackageStartupMessages(library(x, character.only = TRUE))
+            }else{
+                install.packages(x)
+                suppressPackageStartupMessages(library(x, character.only = TRUE))
+            }
+
             x
         },USE.NAMES = FALSE)
 
@@ -51,10 +57,10 @@ suppressWarnings(data_testing_national <- data_testing_raw $tested %>%
                                new_negatives = new_tests - new_positives) %>%
                      filter(date > Sys.Date()-24)
 )
-data_testing_state <- read_csv("https://api.covid19india.org/csv/latest/statewise_tested_numbers_data.csv") %>% 
-    mutate("Updated On" = as.Date(`Updated On`,"%d/%m/%Y")) %>% 
+data_testing_state <- read_csv("https://api.covid19india.org/csv/latest/statewise_tested_numbers_data.csv") %>%
+    mutate("Updated On" = as.Date(`Updated On`,"%d/%m/%Y")) %>%
     filter(`Updated On` > "2020-03-01")
-    
+
 cat("https://api.covid19india.org/data.json\n")
 # This file is used for semi-log plot -------------------------------------
 

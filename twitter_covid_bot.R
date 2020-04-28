@@ -11,7 +11,7 @@ source("generate_plots.R")
 post_tweet(status = paste0("Covid Monitoring for India: ",Sys.Date(),""),
            token = token)
 
-list.files("lots", full.names = TRUE,
+list.files("plots", full.names = TRUE,
            pattern = Sys.Date() %>%  as.character()) %>%
     sapply(function(i){
         post_tweet(status = gsub(paste0("plots/",Sys.Date(),"_|.png"),"",x = i) %>%
