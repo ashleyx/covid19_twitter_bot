@@ -24,3 +24,23 @@ list.files("plots", full.names = TRUE,
 post_tweet(status = "Update Sucessful @theashleyxavier",
            token = token,
            in_reply_to_status_id = get_last_tweet_id())
+
+
+source("statewise_monitoring.R")
+
+post_tweet(status = paste0("State-wise Covid Monitoring for India: ",Sys.Date(),""),
+           token = token)
+
+list.files(paste0("statewise_plot/",Sys.Date()), full.names = TRUE,
+           pattern = Sys.Date() %>%  as.character()) %>%
+    sapply(function(i){
+        post_tweet(status = gsub(paste0(".*_|.png"),"",x = i) %>%
+                       gsub("-"," ",x=.) %>% paste0(collapse = ""),
+                   token = token,
+                   media = i,
+                   in_reply_to_status_id = get_last_tweet_id())
+    }) %>% invisible()
+
+post_tweet(status = "Statewise Update Sucessful @theashleyxavier",
+           token = token,
+           in_reply_to_status_id = get_last_tweet_id())

@@ -5,29 +5,26 @@ source("load_data.R")
 #  -------------------------------------------------------------
 
 # daily new cases ---------------------------------------------------------
-last_plot <- data_india_raw %>% group_by(dateannounced) %>%
-    summarise(count = length(dateannounced)) %>%
-    filter(dateannounced > Sys.Date()-42) %>%
-    ggplot(aes(x=dateannounced, y = count))+
+last_plot <-  data_india %>% 
+    melt(id.vars = "date")%>% 
+    filter(variable == "dailyconfirmed",
+                       date > Sys.Date() - 30) %>% 
+    ggplot(aes(x=date, y = value))+
     geom_histogram(stat="identity")+
     theme_bw() +
     scale_y_continuous(expand = c(-Inf,1))+
-    scale_x_date(date_breaks = "3 days" , date_labels = "%d/%m/%Y",
-                 expand = c(0,0))+
-    xlab("Date (dd/mm/yyyy)") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1,),
-          panel.grid.major.x = element_blank(),
+    theme(panel.grid.major.x = element_blank(),
           panel.grid.minor.x = element_blank(),
           axis.title.y = element_blank()) +
     labs(title = "Daily New Cases, India",
          caption = "Data: covid19india.org API")
 
-ggsave(filename = paste0("plots/",Sys.Date(),"_daily_new_cases.png"),
+ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_daily_new_cases.png"),
        plot = last_plot ,
        height = 8, width = 8 )
 
 # trends of cumulative for top states ---------------------------------------------------------
-# paste0("plots/",Sys.Date(),
+# paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),
 #        "_statewise_confirmed_",1:5,".png") %>%
 #     sapply(function(i){
 #         if(file.exists(i))file.remove(i)
@@ -58,88 +55,67 @@ ggsave(filename = paste0("plots/",Sys.Date(),"_daily_new_cases.png"),
 #             labs(title = "Cumulative Confirmed Cases",
 #                  caption = "Data: covid19india.org API")
 #         for(j in 1:5){
-#             if(!file.exists(paste0("plots/",Sys.Date(),
+#             if(!file.exists(paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),
 #                                    "_statewise_confirmed_",j,".png"))){
 #                 break
 #             }
 #         }
-#         ggsave(filename = paste0("plots/",Sys.Date(),
+#         ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),
 #                                  "_statewise_confirmed_",j,".png"),
 #                plot = last_plot ,
 #                height = 8, width = 8 )
 #
 #     })
 #
+
+
 # National percent new cases + doubling time ---------------------------------------------------------
-last_plot <- data_india_state %>% group_by(date) %>%
-    summarize(daily = sum(confirmed)) %>%
-    mutate(total = cumsum(daily),
-           percent_increase = round(100*daily/lag(total), digits = 0),
+last_plot <- data_india %>% 
+    mutate(percent_increase = round(100*dailyconfirmed/lag(totalconfirmed), digits = 1),
            doubling_time = round(log(x = 2,base = (1+percent_increase/100)), digits = 1)) %>%
     filter(date > Sys.Date()-21) %>%
     ggplot(aes(x= date , y = percent_increase)) + geom_histogram(stat = "identity") +
     geom_text(aes(x= date, y = percent_increase + 1, label = paste0(percent_increase)), color = "#850c0c") +
-    geom_text(aes(x= date, y = percent_increase + 2, label = paste0("(",doubling_time,")")), color = "#30119e") +  theme_bw() +
+    geom_text(aes(x= date, y = percent_increase + 2, label = paste0("(",doubling_time,")")), color = "#30119e") +
+    theme_bw()+
     labs(title = "<span style='color:#30119e'>Effective Doubling Time (days)</span>",
          subtitle = "<span style='color:#850c0c'>Percentage increase over previous day total (%)</span> ",
          caption = "Data: covid19india.org API") +
-    scale_x_date(date_breaks = "3 days" , date_labels = "%d/%m/%Y",
-                 expand = c(0,0))+
     xlab("Date (dd/mm/yyyy)") +
     theme(plot.subtitle = element_markdown(),
           plot.title = element_markdown(),
-          axis.text.x = element_text(angle = 90, hjust = 1,),
           panel.grid.major.x = element_blank(),
-          panel.grid.minor.x = element_blank())
+          panel.grid.minor.x = element_blank(),
+          axis.title.x = element_blank())
 
-ggsave(filename = paste0("plots/",Sys.Date(),"_national_doubling_time.png"),
+ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_national_doubling_time.png"),
        plot = last_plot ,
        height = 8, width = 8 )
 
 
 # Plot on Testing Numbers -----------------------------------------------------------
 
-last_plot <- data_testing_national  %>%
-    melt(id.vars = "date") %>% filter(variable != "new_tests") %>%
-    ggplot()+
-    geom_histogram(aes(x=date , y= value, fill = variable),
-                   stat = "identity") +
-    geom_text(data = data_testing_national %>%
-                  mutate(percent = round(100*new_positives/new_tests,1)),
-              aes(x= date , y = new_tests+ 1000,
-                  label = paste0(percent,"%"))) +
-    scale_fill_grey() +
-    scale_x_date(date_breaks = "3 days" , date_labels = "%d/%m/%Y")+
-    labs(title = "New Tests at each ICMR Notification",
-         subtitle = "% positive indicated as text",
-         caption = "Data: covid19india.org API") +
-    theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1,),
-                       panel.grid.major.x = element_blank(),
-                       panel.grid.minor.x = element_blank(),
-                       axis.title.x = element_blank(),
-                       axis.title.y = element_blank(),
-                       legend.position = "bottom",
-                       legend.title = element_blank())
+last_plot <- data_testing_national %>% 
+    ggplot(aes(x = date, y = new_tested)) + geom_histogram(stat = "identity") +
+    ggtitle("Daily Tested Total") + 
+    theme_bw() +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())
 
-ggsave(filename = paste0("plots/",Sys.Date(),"_ICMR_testing.png"),
+ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_ICMR_testing.png"),
        plot = last_plot ,
        height = 10, width = 10 )
 
 
 
 # National Semi-log plot --------------------------------------------------
-tmp <- data_india %>% group_by(date,status) %>%
-    summarise(count = sum(count)) %>%
-    group_by(status) %>%
-    mutate(total = cumsum(count)) %>%
-    skim_tee()
-
-last_plot <- tmp %>% ggplot(aes(x=date, y = total, color = status)) +
-    geom_line(aes(group = status)) +
-    geom_smooth(data = tmp %>% filter(date < "2020-04-01"),
-                method = lm , se = FALSE, linetype = 3,
-                formula = y ~ x , fullrange = TRUE)+
-    gghighlight(label_key = total,use_direct_label = TRUE) +
+last_plot <- data_india %>% 
+    melt(id.vars = "date") %>% 
+    filter(variable %in% c("totalconfirmed","totalrecovered","totaldeceased")) %>% 
+    filter(date > (Sys.Date()- 45)) %>% 
+    ggplot(aes(x= date, y = value , color = variable))+ 
+    geom_line()+
+    gghighlight(label_key = value)+
     guides(colour = guide_legend("legend" ,override.aes = aes(label = "|")))+
     theme_bw() +
     scale_x_date(date_breaks = "3 days" , date_labels = "%b %d")+
@@ -158,23 +134,23 @@ last_plot <- tmp %>% ggplot(aes(x=date, y = total, color = status)) +
           axis.title.y = element_blank(),
           legend.position = "none")
 
-ggsave(filename = paste0("plots/",Sys.Date(),"_semilog_trend.png"),
+
+ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_semilog_trend.png"),
        plot = last_plot ,
        height = 7, width = 7)
 
 
-
 # trajectory plot ---------------------------------------------------------
 
-last_plot <- data_india_state %>%
+ data_india_state %>%
     group_by(detectedstate) %>%
     summarise(date_at_100 = as.character(min(date[confirmed > 100])), na.rm = TRUE)  %>%
     left_join(data_india_state, by = "detectedstate") %>%
     mutate( days = difftime(date, date_at_100, units = "days") %>% ceiling() %>% as.integer()) %>%
     filter(days > 0 ) %>%
     ggplot(aes(x= days, y = confirmed)) + geom_line(aes(color = detectedstate))+
-    scale_y_log10(limits = c(100,10000), breaks = c(100,200,400,800,seq(2000,10000,2000))) +
-    scale_x_continuous( limits = c(0,40), expand = c(0,0)) +
+    scale_y_log10(limits = c(100,20000), breaks = c(100,200,400,800,seq(2000,20000,2000))) +
+    scale_x_continuous(expand = c(0,5)) +
     gghighlight(label_key = detectedstate)+ xlab("Days since 100th confirmed case") +
     labs(title = "Statewise Cumulative Confirmed Counts on semi-log scale",
          caption = "Data: covid19india.org API") +
@@ -182,17 +158,17 @@ last_plot <- data_india_state %>%
     theme(axis.title.y = element_blank(),
           legend.position = "none")
 
-ggsave(filename = paste0("plots/",Sys.Date(),"_trajectory.png"),
+ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_trajectory.png"),
        plot = last_plot ,
        height = 9, width = 9)
 
 
 # trajectory of tests  ----------------------------------------------------
 
-last_plot <- data_testing_state %>% group_by(State) %>%
+last_plot <- data_testing_state %>% group_by(State) %>% 
     filter(min(Positive, na.rm = TRUE) > 100,
-           !is.na(Positive) & !is.na(Negative)) %>%
-    ggplot(aes(x = Negative, y = Positive, color = State, group = State))+
+           !is.na(Positive) & !is.na(Negative)) %>% 
+    ggplot(aes(x = Negative, y = Positive, color = State, group = State))+ 
     # geom_point() +
     geom_line() +
     gghighlight(label_key = State,max_highlight = 30,label_params = list(size = 3)) +
@@ -202,6 +178,6 @@ last_plot <- data_testing_state %>% group_by(State) %>%
     theme(legend.position = "bottom")+
     ggtitle("Trajectory of Positive vs Negative tests")
 
-ggsave(filename = paste0("plots/",Sys.Date(),"_testing_trajectory.png"),
+ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_testing_trajectory.png"),
        plot = last_plot ,
        height = 9, width = 9)
