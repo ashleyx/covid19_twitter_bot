@@ -144,12 +144,13 @@ ggsave(filename = paste0("~/git/covid19_twitter_bot/plots/",Sys.Date(),"_semilog
 
 last_plot <- data_india_state %>%
     group_by(detectedstate) %>%
-    summarise(date_at_100 = as.character(min(date[confirmed > 100])), na.rm = TRUE)  %>%
+    summarise(date_at_100 = as.character(min(date[confirmed > 100], na.rm = TRUE)))  %>%
     left_join(data_india_state, by = "detectedstate") %>%
     mutate( days = difftime(date, date_at_100, units = "days") %>% ceiling() %>% as.integer()) %>%
-    filter(days > 0 ) %>%
+    filter(days > 0 ,
+           !is.na(confirmed)) %>%
     ggplot(aes(x= days, y = confirmed)) + geom_line(aes(color = detectedstate))+
-    scale_y_log10(limits = c(100,20000), breaks = c(100,200,400,800,seq(2000,20000,2000))) +
+    scale_y_log10() +
     scale_x_continuous(expand = c(0,5)) +
     gghighlight(label_key = detectedstate)+ xlab("Days since 100th confirmed case") +
     labs(title = "Statewise Cumulative Confirmed Counts on semi-log scale",

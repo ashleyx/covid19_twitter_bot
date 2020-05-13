@@ -1,6 +1,6 @@
 # library imports ----------------------------------------------------------
 
-sapply( c("magrittr","dplyr","reshape2","ggplot2","jsonlite"),
+sapply( c("magrittr","dplyr","reshape2","ggplot2","jsonlite","EpiEstim","patchwork"),
         function(x){
           if(!x %in% rownames(installed.packages())){
             install.packages(x)
@@ -113,7 +113,7 @@ data_state %>% group_by(state) %>%
       (7 - 1)
 
 
-    final_plot <- data %>%  filter(status == "Confirmed") %>%
+    p1 <- data %>%  filter(status == "Confirmed") %>%
       ggplot(aes(x= date)) +
       geom_histogram(aes(y = count),stat = "identity", fill = "#999999")+
       geom_histogram(data = predicted,aes(x = date, y = mean), fill = "#CCCCCC", stat = "identity")+
@@ -124,9 +124,34 @@ data_state %>% group_by(state) %>%
       # geom_line(data = predicted,aes(x = date, y = mean), linetype = 2) +
       theme_bw()
 
+    Rt <- data %>%
+      dcast(data = . , formula = date ~ status, value.var = "count") %>%
+      transmute(dates = date , I = Confirmed) %>%
+      estimate_R(incid = .,
+                 method = "parametric_si",
+                 config = make_config(list(mean_si = 5.12,std_si = 3)))
+    p2 <- data.frame(date = Rt$dates[8:length(Rt$dates)],
+               R = Rt$R$`Mean(R)`) %>%
+      ggplot(aes(x= date , y = R))+ geom_line()+
+      geom_hline(yintercept = 1) +
+      ggtitle(label = "Effective Reproduction Number")+
+      theme_bw() +
+      theme(axis.title.x = element_blank())
+
+    p3 <- data_testing_state %>% filter(State == s) %>%
+      mutate(new_tests = `Total Tested` - lag(`Total Tested`)) %>%
+      ggplot(aes(x= `Updated On` , y = new_tests))+
+      geom_histogram(stat="identity")+
+      ggtitle(label = "New Tests done at each annoucement")+
+      theme_bw()+
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank())
+
+    final_plot <- p1 + (p2/p3) +
+      plot_layout(widths = c(2,1))
     ggsave(paste0("statewise_plot/",Sys.Date(),"/",Sys.Date(),"_",gsub(" ","-",s),".png"),
            plot = final_plot,
-           width = 7 , height = 7)
+           width = 10 , height = 10)
 
   }) %>%  invisible()
 
