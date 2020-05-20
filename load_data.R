@@ -8,7 +8,7 @@ sapply( c("magrittr","dplyr","readr","reshape2","skimr","ggplot2","gghighlight",
                 install.packages(x)
             }
             suppressPackageStartupMessages(library(x, character.only = TRUE))
-
+            
             x
         },USE.NAMES = FALSE)
 
@@ -18,21 +18,21 @@ sapply( c("magrittr","dplyr","readr","reshape2","skimr","ggplot2","gghighlight",
 
 # This is the file used for testing numbers  ------------------------------
 data_testing_raw <- read_json("https://api.covid19india.org/data.json",simplifyVector = TRUE)
-data_testing_national <- data_testing_raw$tested  %>%
+data_testing_national <- data_testing_raw$tested  %>% 
                      transmute(total = as.integer(totalsamplestested),
                                date = as.Date(updatetimestamp,"%d/%m/%Y"),
                                new_tested = total - lag(total,order_by = date))
 cat("https://api.covid19india.org/data.json\n")
 
-data_testing_state <- read_csv("https://api.covid19india.org/csv/latest/statewise_tested_numbers_data.csv") %>%
-    mutate("Updated On" = as.Date(`Updated On`,"%d/%m/%Y")) %>%
+data_testing_state <- read_csv("https://api.covid19india.org/csv/latest/statewise_tested_numbers_data.csv") %>% 
+    mutate("Updated On" = as.Date(`Updated On`,"%d/%m/%Y")) %>% 
     filter(`Updated On` > "2020-03-01")
-
+    
 cat("https://api.covid19india.org/csv/latest/statewise_tested_numbers_data.csv\n")
 # This file is used for semi-log plot -------------------------------------
 
-data_india <- data_testing_raw$cases_time_series %>% mutate(date = as.Date(date,"%d %b")) %>%
-    mutate_if(is.character,as.integer)
+data_india <- data_testing_raw$cases_time_series %>% mutate(date = as.Date(date,"%d %b")) %>% 
+    mutate_if(is.character,as.integer) 
 
 data_state <- read_json("https://api.covid19india.org/states_daily.json",simplifyVector = TRUE)$states_daily %>%
     melt(id.vars = c("status","date")) %>%
@@ -51,24 +51,27 @@ data_state$state %<>% as.character() %>%
 
 cat("https://api.covid19india.org/states_daily.json\n")
 
+
 # Data updates throughout the day. The total tally for previous day only refects post midnight
 
 # This was the file used for most plots ----------------------------------------------------------------------
 
-data_india_raw <- lapply(1:2, function(i){
+data_india_raw <- data_india_raw <- lapply(1:2, function(i){
     read_json(paste0("https://api.covid19india.org/raw_data",i,".json"),simplifyVector = TRUE)$raw_data %>%
         transmute(dateannounced,
-               detectedstate,
-               detecteddistrict,
-               numcases = 1)
+                  detectedstate,
+                  detecteddistrict,
+                  numcases = 1)
 }) %>%
     Reduce(f = rbind, x = .) %>%
-    rbind(read_json(paste0("https://api.covid19india.org/raw_data3.json"),simplifyVector = TRUE)$raw_data %>%
-              filter(currentstatus == "Hospitalized") %>%
-              transmute(dateannounced,
-                        detectedstate,
-                        detecteddistrict,
-                        numcases) ) %>%
+    rbind(lapply(3:4, function(i){
+        read_json(paste0("https://api.covid19india.org/raw_data",i,".json"),simplifyVector = TRUE)$raw_data %>%
+            filter(currentstatus == "Hospitalized") %>%
+            transmute(dateannounced,
+                      detectedstate,
+                      detecteddistrict,
+                      numcases)
+    }) %>%  Reduce(f = rbind, x = .)) %>%
     mutate(dateannounced = as.Date(dateannounced, "%d/%m/%y"),
            numcases = as.integer(numcases))  %>%
     filter(!is.na(dateannounced))
@@ -87,10 +90,11 @@ data_india_state <- unique(data_india_raw$dateannounced) %>% lapply(function(d){
         mutate(date = d)
 }) %>%  Reduce(f = rbind)
 
-cat("https://api.covid19india.org/raw_data[1,2,3].json\n")
+cat("https://api.covid19india.org/raw_data[1-4]json")
+
 
 # # population data ---------------------------------------------------------
-#
+# 
 # population_data <-readHTMLTable(readLines("https://en.wikipedia.org/wiki/List_of_states_and_union_territories_of_India_by_population"))[[2]] %>%
 #     {
 #         population_data <- data.frame(.[-1,])
@@ -98,8 +102,7 @@ cat("https://api.covid19india.org/raw_data[1,2,3].json\n")
 #         population_data %>%
 #             transmute(state = `State or union territory` %>% gsub("\\[c\\]","",x = .),
 #                       pop = gsub("[^0-9]","",population_data$`Population(%)`) %>%   as.numeric())
-#
+#         
 #     }
 
 cat("All done")
-
