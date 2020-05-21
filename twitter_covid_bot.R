@@ -5,6 +5,7 @@ token <- get_token()
 get_last_tweet_id <- function(){
     get_timeline("AshleysBot2")$status_id[1]
 }
+
 source("generate_plots.R")
 
 
