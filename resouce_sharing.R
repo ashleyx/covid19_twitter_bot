@@ -123,14 +123,17 @@ while(TRUE){
     update_request_tweets()
     processed_tweets <- read_tsv("processed_tweets.tsv",
                                  col_types = cols(
-                                     time = col_datetime(format = ""),
+                                     time = col_datetime(format =  "%Y-%m-%d %H:%M:%S"),
                                      status_id = col_character()
                                  )) %>% as.data.frame()
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
     i <-  1
     count_posted <- 0
+    time_posted <- c()
     while(i <= nrow(requests)){
         response <- find_best_response(requests$text[i])
+        count_posted <- count_posted - sum(time_posted < (Sys.time() - 3600))
+        time_posted <- time_posted[time_posted > ( Sys.time() - 3600)]
         if(is.na(response)){
             i = i+1
         }else{
@@ -140,17 +143,20 @@ while(TRUE){
                        auto_populate_reply_metadata = TRUE)
             write(paste0(Sys.time(),"\t",requests$status_id[i]),
                   "processed_tweets.tsv",append = TRUE)
-            i = i+1
-            count_posted = count_posted + 1
+            i <- i+1
+            count_posted <- count_posted + 1
+            time_posted <- c(time_posted,Sys.time())
             count_retires <- 0
-            cat(as.character(count),'\n')
+            cat(as.character(count_posted),'\n')
         }
         flag = TRUE
         if(count_posted >= 90){
             break
         }
         while(flag){
-            count_processed <- processed_tweets %>% filter(time > (Sys.time() - 3600)) %>% nrow()
+            count_processed <-  sum(sapply(as.character(processed_tweets$time),
+                                           function(i) difftime(as.character(Sys.time()),i,units = 'mins')) < 60)
+            #^i think tidyverse datetime isn't getting along base R datetime
             if((count_processed + count_posted) < 90){
                 flag = FALSE
             }else{
