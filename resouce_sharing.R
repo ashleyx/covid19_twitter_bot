@@ -1,12 +1,17 @@
-library(rtweet)
-library(magrittr)
-library(readr)
-library(stringr)
-library(dplyr)
+libraries <- c('rtweet','magrittr','readr','stringr','dplyr')
+if(!all(libraries %in% rownames(installed.packages()))){
+    install.packages(libraries)
+}
+sapply(libraries, function(i){
+    suppressPackageStartupMessages(library(i,character.only = TRUE))
+    i
+},USE.NAMES = FALSE)
 
 district_data <- read_tsv("GADM.tsv")
-additional_districts <- read_lines("districts_extra.txt")
-district_pattern <- paste0(c(tolower(district_data$DISTRICT),additional_districts),collapse ='|')
+#districts_extra is where i'm dumping all alternate spellings
+additional_districts <- read_lines("districts_extra.txt") %>% unique()
+district_pattern <- paste0(c(tolower(district_data$DISTRICT),additional_districts),
+                           collapse ='\b|\b#?')
 # state_pattern <- paste0(tolower(district_data$ST_NM) %>% unique(),collapse ='|')
 
 if(!file.exists("processed_tweets.tsv")){
@@ -27,19 +32,21 @@ token <- create_token(
 # database update functions -----------------------------------------------
 update_request_tweets <- function(){
     if(!all(c('request_timestamp','requests') %in% ls())){
-        requests <- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
-                                  include_rts = FALSE,
-                                  geocode = "21.0,78.0,1900km",
-                                  n=1000,
-                                  parse = TRUE) %>% as.data.frame()
+        cat('\nPulling \'request\' tweets:file not found in env\n')
+        requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
+                                   include_rts = FALSE,
+                                   geocode = "21.0,78.0,1900km",
+                                   n=1000,
+                                   parse = TRUE) %>% as.data.frame()
 
         request_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 20){
-        requests <- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
-                                  include_rts = FALSE,
-                                  geocode = "21.0,78.0,1900km",
-                                  n=1000,
-                                  parse = TRUE) %>% as.data.frame()
+        cat('\nPulling \'request\' tweets:file timeout since last pull\n')
+        requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
+                                   include_rts = FALSE,
+                                   geocode = "21.0,78.0,1900km",
+                                   n=1000,
+                                   parse = TRUE) %>% as.data.frame()
 
         request_timestamp <<- Sys.time()
     }
@@ -47,17 +54,18 @@ update_request_tweets <- function(){
 
 update_available_tweets <- function(){
     if(!all(c('availability_timestamp','available') %in% ls())){
+        cat('\nPulling \'available\' tweets:file not found in env\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
-                                    n=10000,
+                                    n=2500,
                                     parse = TRUE) %>% as.data.frame()
         availability_timestamp <<- Sys.time()
-    }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 20){
+    }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 60){
         available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
-                                    n=10000,
+                                    n=2500,
                                     parse = TRUE) %>% as.data.frame()
         availability_timestamp <<- Sys.time()
     }
@@ -88,12 +96,12 @@ find_best_response <- function(text){
     link <- paste0("https://twitter.com/",
                    avail_loc$user_id[1],
                    "/status/",
-                   avail_loc$status_id)
-    response <- paste0("Most recent tweet found for ",
+                   avail_loc$status_id[1])
+    response <- paste0("Recent tweet found for '",
                        paste0(req_queries,collapse ="/"),
-                       " at ",
+                       "' at '",
                        paste0(req_district,collapse = "/"),
-                       " is: \n ",
+                       "' is: \n ",
                        link)
     if(nchar(response) <= 280){
         return(response)
@@ -103,6 +111,7 @@ find_best_response <- function(text){
 }
 
 while(TRUE){
+
     update_request_tweets()
     processed_tweets <- read_tsv("processed_tweets.tsv") %>% as.data.frame()
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
@@ -113,12 +122,12 @@ while(TRUE){
         if(is.na(response)){
             i = i+1
         }else{
-            write(paste0(Sys.time(),"\t",requests$status_id[i]),
-                  "processed_tweets.tsv",append = TRUE)
             post_tweet(status = response,
                        token = token,
                        in_reply_to_status_id = requests$status_id[i],
                        auto_populate_reply_metadata = TRUE)
+            write(paste0(Sys.time(),"\t",requests$status_id[i]),
+                  "processed_tweets.tsv",append = TRUE)
             i = i+1
             count = count + 1
         }
@@ -133,6 +142,9 @@ while(TRUE){
             }else{
                 Sys.sleep(300)
             }
+        }
+        if(i == nrow(requests)){
+            cat('\nExhausted search on all pulled \'request\' tweets')
         }
     }
 }
