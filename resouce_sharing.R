@@ -36,7 +36,7 @@ token <- create_token(
 # database update functions -----------------------------------------------
 update_request_tweets <- function(){
     if(!all(c('request_timestamp','requests') %in% ls(envir = globalenv()))){
-        cat('\nPulling \'request\' tweets:file not found in env\n')
+        cat('\nPulling \'request\' tweets:data not found in env\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,1900km",
@@ -45,7 +45,7 @@ update_request_tweets <- function(){
 
         request_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- request_timestamp, units = "mins") > 20){
-        cat('\nPulling \'request\' tweets:file timeout since last pull\n')
+        cat('\nPulling \'request\' tweets:data timeout since last pull\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,1900km",
@@ -57,8 +57,8 @@ update_request_tweets <- function(){
 }
 
 update_available_tweets <- function(){
-    if(!all(c('availability_timestamp','available') %in% ls())){
-        cat('\nPulling \'available\' tweets:file not found in env\n')
+    if(!all(c('availability_timestamp','available') %in% ls(envir = globalenv()))){
+        cat('\nPulling \'available\' tweets:data not found in env\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
@@ -66,7 +66,7 @@ update_available_tweets <- function(){
                                     parse = TRUE) %>% as.data.frame()
         availability_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 60){
-        cat('\nPulling \'available\' tweets:file timeout since last pull\n')
+        cat('\nPulling \'available\' tweets:data timeout since last pull\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
@@ -106,7 +106,7 @@ find_best_response <- function(text){
                        paste0(req_queries,collapse ="/"),
                        "' at '",
                        paste0(req_district,collapse = "/"),
-                       "' is: \n ",
+                       "' : \n ",
                        link)
     if(nchar(response) <= 280){
         return(response)
@@ -114,6 +114,11 @@ find_best_response <- function(text){
         return(link)
     }
 }
+
+
+# the persistant code -----------------------------------------------------
+
+
 count_retires <- 0
 while(TRUE){
     update_request_tweets()
