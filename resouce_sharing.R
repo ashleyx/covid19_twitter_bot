@@ -87,7 +87,8 @@ find_best_response <- function(text){
     update_available_tweets()
     query_words <- c("bed",'icu',"ventilator",
                      "oxygen","refill","cylinder")
-    avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,req_district))),]
+    avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,
+                                                                             paste0('\\b',req_district,'\\b')))),]
     if(nrow(avail_loc) == 0){
         return(NA)
     }
@@ -115,7 +116,7 @@ find_best_response <- function(text){
 }
 
 
-# the persistant code -----------------------------------------------------
+# the persistent code -----------------------------------------------------
 
 
 count_retires <- 0
