@@ -2,11 +2,10 @@ libraries <- c('rtweet','magrittr','readr','stringr','dplyr')
 if(!all(libraries %in% rownames(installed.packages()))){
     install.packages(libraries)
 }
-sapply(libraries, function(i){
+invisible(sapply(libraries, function(i){
     suppressPackageStartupMessages(library(i,character.only = TRUE))
     i
-},USE.NAMES = FALSE)
-
+},USE.NAMES = FALSE) )
 district_data <- read_tsv("GADM.tsv",
                           col_types = cols(
                               DISTRICT = col_character(),
@@ -88,7 +87,7 @@ find_best_response <- function(text){
     update_available_tweets()
     query_words <- c("bed",'icu',"ventilator",
                      "oxygen","refill","cylinder")
-    avail_loc <- available %>% filter(any(str_detect(text,req_district)))
+    avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,req_district))),]
     if(nrow(avail_loc) == 0){
         return(NA)
     }
@@ -144,6 +143,7 @@ while(TRUE){
             i = i+1
             count_posted = count_posted + 1
             count_retires <- 0
+            cat(as.character(count),'\n')
         }
         flag = TRUE
         if(count_posted >= 90){
