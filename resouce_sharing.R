@@ -7,11 +7,15 @@ sapply(libraries, function(i){
     i
 },USE.NAMES = FALSE)
 
-district_data <- read_tsv("GADM.tsv")
-#districts_extra is where i'm dumping all alternate spellings
+district_data <- read_tsv("GADM.tsv",
+                          col_types = cols(
+                              DISTRICT = col_character(),
+                              ST_NM = col_character()
+                          ))
+#districts_extra is where i'm dumping all alternate spellings i find
 additional_districts <- read_lines("districts_extra.txt") %>% unique()
 district_pattern <- paste0(c(tolower(district_data$DISTRICT),additional_districts),
-                           collapse ='\b|\b#?')
+                           collapse ='\\b|\\b#?')
 # state_pattern <- paste0(tolower(district_data$ST_NM) %>% unique(),collapse ='|')
 
 if(!file.exists("processed_tweets.tsv")){
@@ -31,7 +35,7 @@ token <- create_token(
 
 # database update functions -----------------------------------------------
 update_request_tweets <- function(){
-    if(!all(c('request_timestamp','requests') %in% ls())){
+    if(!all(c('request_timestamp','requests') %in% ls(envir = globalenv()))){
         cat('\nPulling \'request\' tweets:file not found in env\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
                                    include_rts = FALSE,
@@ -40,7 +44,7 @@ update_request_tweets <- function(){
                                    parse = TRUE) %>% as.data.frame()
 
         request_timestamp <<- Sys.time()
-    }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 20){
+    }else if(as.numeric(Sys.time()- request_timestamp, units = "mins") > 20){
         cat('\nPulling \'request\' tweets:file timeout since last pull\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
                                    include_rts = FALSE,
@@ -62,6 +66,7 @@ update_available_tweets <- function(){
                                     parse = TRUE) %>% as.data.frame()
         availability_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 60){
+        cat('\nPulling \'available\' tweets:file timeout since last pull\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
@@ -109,14 +114,17 @@ find_best_response <- function(text){
         return(link)
     }
 }
-
+count_retires <- 0
 while(TRUE){
-
     update_request_tweets()
-    processed_tweets <- read_tsv("processed_tweets.tsv") %>% as.data.frame()
+    processed_tweets <- read_tsv("processed_tweets.tsv",
+                                 col_types = cols(
+                                     time = col_datetime(format = ""),
+                                     status_id = col_character()
+                                 )) %>% as.data.frame()
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
-    i = 1
-    count = 0
+    i <-  1
+    count_posted <- 0
     while(i <= nrow(requests)){
         response <- find_best_response(requests$text[i])
         if(is.na(response)){
@@ -129,22 +137,29 @@ while(TRUE){
             write(paste0(Sys.time(),"\t",requests$status_id[i]),
                   "processed_tweets.tsv",append = TRUE)
             i = i+1
-            count = count + 1
+            count_posted = count_posted + 1
+            count_retires <- 0
         }
         flag = TRUE
-        if(count >= 90){
+        if(count_posted >= 90){
             break
         }
         while(flag){
-            count_processed <- processed_tweets %>% filter(time < (Sys.time() - 3600)) %>% nrow()
-            if((count_processed + count) < 90){
+            count_processed <- processed_tweets %>% filter(time > (Sys.time() - 3600)) %>% nrow()
+            if((count_processed + count_posted) < 90){
                 flag = FALSE
             }else{
+                cat('\nHit posting limit, snoozing for 5 mins and retrying\n')
                 Sys.sleep(300)
             }
         }
         if(i == nrow(requests)){
-            cat('\nExhausted search on all pulled \'request\' tweets')
+            cat('\nExhausted search on all pulled \'request\' tweets\n')
+            count_retires <- count_retires +1
+        }
+        if(count_retires >= 3){
+            cat('\nFound nothing to do in multiple retries, snoozing for 5 mins and retrying\n')
+            Sys.sleep(300)
         }
     }
 }
