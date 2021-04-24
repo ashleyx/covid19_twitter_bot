@@ -98,10 +98,13 @@ find_best_response <- function(text){
         return(NA)
     }
     avail_loc$text %<>% tolower()
-    avail_loc %<>% filter(scores == max(scores),
+    avail_loc %<>% filter(scores == max(scores,na.rm = TRUE),
                           str_detect(text,'need|require',negate = TRUE),
                           !(is.na(user_id) | user_id == 'NA'),
                           !(is.na(status_id) | status_id == 'NA'))
+    if(is.na(avail_loc$user_id[1]) | is.na(avail_loc$user_id[1])){
+        return(NA)
+    }
     link <- paste0("https://twitter.com/",
                    avail_loc$user_id[1],
                    "/status/",
