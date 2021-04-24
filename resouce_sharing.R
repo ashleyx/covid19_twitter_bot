@@ -1,4 +1,4 @@
-libraries <- c('rtweet','magrittr','readr','stringr','dplyr')
+libraries <- c('rtweet','magrittr','readr','stringr','dplyr','lubridate')
 if(!all(libraries %in% rownames(installed.packages()))){
     install.packages(libraries)
 }
@@ -42,8 +42,8 @@ update_request_tweets <- function(){
                                    n=1000,
                                    parse = TRUE) %>% as.data.frame()
 
-        request_timestamp <<- Sys.time()
-    }else if(as.numeric(Sys.time()- request_timestamp, units = "mins") > 20){
+        request_timestamp <<- now(tz="Asia/Kolkata")
+    }else if(as.numeric(now(tz="Asia/Kolkata")- request_timestamp, units = "mins") > 20){
         cat('\nPulling \'request\' tweets:data timeout since last pull\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require OR urgent)", type = "recent",
                                    include_rts = FALSE,
@@ -51,7 +51,7 @@ update_request_tweets <- function(){
                                    n=1000,
                                    parse = TRUE) %>% as.data.frame()
 
-        request_timestamp <<- Sys.time()
+        request_timestamp <<- now(tz="Asia/Kolkata")
     }
 }
 
@@ -63,15 +63,15 @@ update_available_tweets <- function(){
                                     geocode = "21.0,78.0,2200km",
                                     n=2500,
                                     parse = TRUE) %>% as.data.frame()
-        availability_timestamp <<- Sys.time()
-    }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 60){
+        availability_timestamp <<- now(tz="Asia/Kolkata")
+    }else if(as.numeric(now(tz="Asia/Kolkata")- availability_timestamp, units = "mins") > 60){
         cat('\nPulling \'available\' tweets:data timeout since last pull\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND (verified OR available)", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,2200km",
                                     n=2500,
                                     parse = TRUE) %>% as.data.frame()
-        availability_timestamp <<- Sys.time()
+        availability_timestamp <<- now(tz="Asia/Kolkata")
     }
 }
 
@@ -140,11 +140,8 @@ while(TRUE){
     time_posted <- c()
     while(i <= nrow(requests)){
         response <- find_best_response(requests$text[i])
-        count_posted <- count_posted - sum(time_posted < (Sys.time() - 3600))
-        time_posted <- time_posted[time_posted > ( Sys.time() - 3600)]
-        if(count_posted > 90){
-            break
-        }
+        count_posted <- count_posted - sum( as.numeric(now(tz="Asia/Kolkata") - time_posted, units = "mins") > 60)
+        time_posted <- time_posted[as.numeric(now(tz="Asia/Kolkata") - time_posted,units = "mins") < 60]
 
         if(is.na(response)){
             i = i+1
@@ -153,19 +150,20 @@ while(TRUE){
                        token = token,
                        in_reply_to_status_id = requests$status_id[i],
                        auto_populate_reply_metadata = TRUE)
-            write(paste0(Sys.time(),"\t",requests$status_id[i]),
+            write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
                   "processed_tweets.tsv",append = TRUE)
             i <- i+1
             count_posted <- count_posted + 1
-            time_posted <- c(time_posted,Sys.time())
+            time_posted <- c(time_posted,now(tz="Asia/Kolkata"))
             count_retires <- 0
             cat(as.character(count_posted),'\n')
         }
+        if(count_posted >= 90){
+            break
+        }
         flag = TRUE
         while(flag){
-            count_processed <-  sum(sapply(as.character(processed_tweets$time),
-                                           function(i) difftime(as.character(Sys.time()),i,units = 'mins')) < 60)
-            #^i think tidyverse datetime isn't getting along base R datetime
+            count_processed <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
             if((count_processed + count_posted) < 90){
                 flag = FALSE
             }else{
