@@ -38,7 +38,7 @@ update_request_tweets <- function(){
         cat('\nPulling \'request\' tweets:data not found in env\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require OR urgent)", type = "recent",
                                    include_rts = FALSE,
-                                   geocode = "21.0,78.0,1900km",
+                                   geocode = "21.0,78.0,2200km",
                                    n=1000,
                                    parse = TRUE) %>% as.data.frame()
 
@@ -47,7 +47,7 @@ update_request_tweets <- function(){
         cat('\nPulling \'request\' tweets:data timeout since last pull\n')
         requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require OR urgent)", type = "recent",
                                    include_rts = FALSE,
-                                   geocode = "21.0,78.0,1900km",
+                                   geocode = "21.0,78.0,2200km",
                                    n=1000,
                                    parse = TRUE) %>% as.data.frame()
 
@@ -60,7 +60,7 @@ update_available_tweets <- function(){
         cat('\nPulling \'available\' tweets:data not found in env\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND (verified OR available)", type = "recent",
                                     include_rts = FALSE,
-                                    geocode = "21.0,78.0,1900km",
+                                    geocode = "21.0,78.0,2200km",
                                     n=2500,
                                     parse = TRUE) %>% as.data.frame()
         availability_timestamp <<- Sys.time()
@@ -68,7 +68,7 @@ update_available_tweets <- function(){
         cat('\nPulling \'available\' tweets:data timeout since last pull\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND (verified OR available)", type = "recent",
                                     include_rts = FALSE,
-                                    geocode = "21.0,78.0,1900km",
+                                    geocode = "21.0,78.0,2200km",
                                     n=2500,
                                     parse = TRUE) %>% as.data.frame()
         availability_timestamp <<- Sys.time()
@@ -86,7 +86,7 @@ find_best_response <- function(text){
     }
     update_available_tweets()
     query_words <- c("bed",'icu',"ventilator",
-                     "oxygen","refill","cylinder")
+                     "oxygen","refill","cylinder","concentrator")
     avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,
                                                                              paste0('\\b',req_district,'\\b')))),]
     if(nrow(avail_loc) == 0){
@@ -142,6 +142,10 @@ while(TRUE){
         response <- find_best_response(requests$text[i])
         count_posted <- count_posted - sum(time_posted < (Sys.time() - 3600))
         time_posted <- time_posted[time_posted > ( Sys.time() - 3600)]
+        if(count_posted > 90){
+            break
+        }
+
         if(is.na(response)){
             i = i+1
         }else{
