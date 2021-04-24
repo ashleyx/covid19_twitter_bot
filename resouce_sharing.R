@@ -36,7 +36,7 @@ token <- create_token(
 update_request_tweets <- function(){
     if(!all(c('request_timestamp','requests') %in% ls(envir = globalenv()))){
         cat('\nPulling \'request\' tweets:data not found in env\n')
-        requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require) AND urgent", type = "recent",
+        requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require OR urgent)", type = "recent",
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,1900km",
                                    n=1000,
@@ -45,7 +45,7 @@ update_request_tweets <- function(){
         request_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- request_timestamp, units = "mins") > 20){
         cat('\nPulling \'request\' tweets:data timeout since last pull\n')
-        requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require) AND urgent", type = "recent",
+        requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require OR urgent)", type = "recent",
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,1900km",
                                    n=1000,
@@ -58,7 +58,7 @@ update_request_tweets <- function(){
 update_available_tweets <- function(){
     if(!all(c('availability_timestamp','available') %in% ls(envir = globalenv()))){
         cat('\nPulling \'available\' tweets:data not found in env\n')
-        available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
+        available <<- search_tweets(q = "(oxygen OR bed) AND verified AND NOT (require or need)", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
                                     n=2500,
@@ -66,7 +66,7 @@ update_available_tweets <- function(){
         availability_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 60){
         cat('\nPulling \'available\' tweets:data timeout since last pull\n')
-        available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
+        available <<- search_tweets(q = "(oxygen OR bed) AND verified AND NOT (require or need)", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
                                     n=2500,
@@ -151,9 +151,6 @@ while(TRUE){
             cat(as.character(count_posted),'\n')
         }
         flag = TRUE
-        if(count_posted >= 90){
-            break
-        }
         while(flag){
             count_processed <-  sum(sapply(as.character(processed_tweets$time),
                                            function(i) difftime(as.character(Sys.time()),i,units = 'mins')) < 60)
