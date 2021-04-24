@@ -36,7 +36,7 @@ token <- create_token(
 update_request_tweets <- function(){
     if(!all(c('request_timestamp','requests') %in% ls(envir = globalenv()))){
         cat('\nPulling \'request\' tweets:data not found in env\n')
-        requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
+        requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require) AND urgent", type = "recent",
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,1900km",
                                    n=1000,
@@ -45,7 +45,7 @@ update_request_tweets <- function(){
         request_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- request_timestamp, units = "mins") > 20){
         cat('\nPulling \'request\' tweets:data timeout since last pull\n')
-        requests <<- search_tweets(q = "(oxygen OR bed) AND (needed OR required) AND urgent", type = "recent",
+        requests <<- search_tweets(q = "(oxygen OR bed) AND (need OR require) AND urgent", type = "recent",
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,1900km",
                                    n=1000,
