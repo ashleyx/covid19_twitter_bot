@@ -58,7 +58,7 @@ update_request_tweets <- function(){
 update_available_tweets <- function(){
     if(!all(c('availability_timestamp','available') %in% ls(envir = globalenv()))){
         cat('\nPulling \'available\' tweets:data not found in env\n')
-        available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
+        available <<- search_tweets(q = "(oxygen OR bed) AND (verified OR available)", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
                                     n=2500,
@@ -66,7 +66,7 @@ update_available_tweets <- function(){
         availability_timestamp <<- Sys.time()
     }else if(as.numeric(Sys.time()- availability_timestamp, units = "mins") > 60){
         cat('\nPulling \'available\' tweets:data timeout since last pull\n')
-        available <<- search_tweets(q = "(oxygen OR bed) AND verified", type = "recent",
+        available <<- search_tweets(q = "(oxygen OR bed) AND (verified OR available)", type = "recent",
                                     include_rts = FALSE,
                                     geocode = "21.0,78.0,1900km",
                                     n=2500,
@@ -99,7 +99,9 @@ find_best_response <- function(text){
     }
     avail_loc$text %<>% tolower()
     avail_loc %<>% filter(scores == max(scores),
-                          str_detect(text,'need|require',negate = TRUE))
+                          str_detect(text,'need|require',negate = TRUE),
+                          !(is.na(user_id) | user_id == 'NA'),
+                          !(is.na(status_id) | status_id == 'NA'))
     link <- paste0("https://twitter.com/",
                    avail_loc$user_id[1],
                    "/status/",
@@ -160,7 +162,8 @@ while(TRUE){
             if((count_processed + count_posted) < 90){
                 flag = FALSE
             }else{
-                cat('\nHit posting limit, snoozing for 5 mins and retrying\n')
+                cat('\nHit posting limit, snoozing for 5 mins and retrying')
+                cat('\nCurrent request batch progress',as.character(100*i/nrow(requests)),'%\n')
                 Sys.sleep(300)
             }
         }
