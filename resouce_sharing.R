@@ -6,6 +6,9 @@ invisible(sapply(libraries, function(i){
     suppressPackageStartupMessages(library(i,character.only = TRUE))
     i
 },USE.NAMES = FALSE) )
+
+
+
 district_data <- read_tsv("GADM.tsv",
                           col_types = cols(
                               DISTRICT = col_character(),
@@ -140,7 +143,12 @@ while(TRUE){
     time_posted <- c()
     while(i <= nrow(requests)){
         update_available_tweets()
-        response <- find_best_response(requests$text[i])
+        tryCatch(expr = {
+            response <- find_best_response(requests$text[i])},
+            error = function(e){
+                response <- NA
+            })
+
         count_posted <- count_posted - sum( as.numeric(now(tz="Asia/Kolkata") - time_posted, units = "mins") > 60)
         time_posted <- time_posted[as.numeric(now(tz="Asia/Kolkata") - time_posted,units = "mins") < 60]
 
@@ -162,6 +170,7 @@ while(TRUE){
         if(count_posted >= 90){
             break
         }
+	#Snooze cycling when tweet limit hit
         flag = TRUE
         while(flag){
             count_processed <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
@@ -169,7 +178,7 @@ while(TRUE){
                 flag = FALSE
             }else{
                 cat('\nHit posting limit, snoozing for 5 mins and retrying')
-                cat('\nprocessed_count: ',as.character(count_processed),
+                cat('\ncount_processed: ',as.character(count_processed),
                     '\t count_posted: ',as.character(count_posted))
                 cat('\nCurrent request batch progress',as.character(100*i/nrow(requests)),'%\n')
                 Sys.sleep(300)
@@ -181,6 +190,7 @@ while(TRUE){
             cat('\nExhausted search on all pulled \'request\' tweets\n')
             count_retires <- count_retires +1
         }
+	#Snooze cyclying 2:nothing to do
         if(count_retires >= 3){
             cat('\nFound nothing to do in multiple retries, snoozing for 5 mins and retrying\n')
             Sys.sleep(300)
