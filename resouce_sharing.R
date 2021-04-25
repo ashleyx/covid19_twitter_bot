@@ -84,7 +84,6 @@ find_best_response <- function(text){
     if(length(req_district) == 0){
         return(NA)
     }
-    update_available_tweets()
     query_words <- c("bed",'icu',"ventilator",
                      "oxygen","refill","cylinder","concentrator")
     avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,
@@ -134,11 +133,13 @@ while(TRUE){
                                      time = col_datetime(format =  "%Y-%m-%d %H:%M:%S"),
                                      status_id = col_character()
                                  )) %>% as.data.frame()
+    processed_tweets$time <- force_tz(processed_tweets$time,tz = "Asia/Kolkata")
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
     i <-  1
     count_posted <- 0
     time_posted <- c()
     while(i <= nrow(requests)){
+        update_available_tweets()
         response <- find_best_response(requests$text[i])
         count_posted <- count_posted - sum( as.numeric(now(tz="Asia/Kolkata") - time_posted, units = "mins") > 60)
         time_posted <- time_posted[as.numeric(now(tz="Asia/Kolkata") - time_posted,units = "mins") < 60]
@@ -164,12 +165,16 @@ while(TRUE){
         flag = TRUE
         while(flag){
             count_processed <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
-            if((count_processed + count_posted) < 90){
+            if((count_processed + count_posted) <= 90){
                 flag = FALSE
             }else{
                 cat('\nHit posting limit, snoozing for 5 mins and retrying')
+                cat('\nprocessed_count: ',as.character(count_processed),
+                    '\t count_posted: ',as.character(count_posted))
                 cat('\nCurrent request batch progress',as.character(100*i/nrow(requests)),'%\n')
                 Sys.sleep(300)
+                count_posted <- count_posted - sum( as.numeric(now(tz="Asia/Kolkata") - time_posted, units = "mins") > 60)
+                time_posted <- time_posted[as.numeric(now(tz="Asia/Kolkata") - time_posted,units = "mins") < 60]
             }
         }
         if(i == nrow(requests)){
