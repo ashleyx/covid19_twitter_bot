@@ -97,7 +97,6 @@ Bundi	Rajasthan
 Burhanpur	Madhya Pradesh
 Buxar	Bihar
 Cachar	Assam
-Central	NCT of Delhi
 Chamba	Himachal Pradesh
 Chamoli	Uttarakhand
 Champawat	Uttarakhand
@@ -134,7 +133,6 @@ Damoh	Madhya Pradesh
 Darbhanga	Bihar
 Darjiling	West Bengal
 Darrang	Assam
-Data Not Available	Jammu & Kashmir
 Datia	Madhya Pradesh
 Davanagere	Karnataka
 Debagarh	Odisha
@@ -164,8 +162,6 @@ Dumka	Jharkhand
 Dungarpur	Rajasthan
 Durg	Chhattisgarh
 Dimapur	Nagaland
-East	NCT of Delhi
-East	Sikkim
 East Garo Hills	Meghalaya
 East Godavari	Andhra Pradesh
 East Kameng	Arunanchal Pradesh
@@ -376,7 +372,6 @@ Mewat	Haryana
 Mirzapur	Uttar Pradesh
 Moga	Punjab
 Mokokchung	Nagaland
-Mon	Nagaland
 Moradabad	Uttar Pradesh
 Morena	Madhya Pradesh
 Muktsar	Punjab
@@ -410,14 +405,10 @@ Neemuch	Madhya Pradesh
 Sri Potti Sriramulu Nellore	Andhra Pradesh
 New Delhi	NCT of Delhi
 Nizamabad	Andhra Pradesh
-North	NCT of Delhi
-North	Sikkim
 North 24 Parganas	West Bengal
 Dima Hasao	Assam
-North East	NCT of Delhi
 North Goa	Goa
 North Tripura	Tripura
-North West	NCT of Delhi
 Nuapada	Odisha
 Osmanabad	Maharashtra
 Pakur	Jharkhand
@@ -541,8 +532,6 @@ Subarnapur	Odisha
 Sonbhadra	Uttar Pradesh
 Sonipat	Haryana
 Sonitpur	Assam
-South	NCT of Delhi
-South	Sikkim
 South 24 Parganas	West Bengal
 South Garo Hills	Meghalaya
 South Goa	Goa
@@ -610,8 +599,6 @@ Warangal	Andhra Pradesh
 Wardha	Maharashtra
 Washim	Maharashtra
 Wayanad	Kerala
-West	NCT of Delhi
-West	Sikkim
 West Garo Hills	Meghalaya
 West Godavari	Andhra Pradesh
 West Kameng	Arunanchal Pradesh

@@ -1,2 +1,6 @@
 ahmedabad
 bengaluru
+north delhi
+south delhi
+west delhi
+east delhi
