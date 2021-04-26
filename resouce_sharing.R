@@ -63,8 +63,8 @@ update_request_tweets <- function(){
 }
 
 update_available_tweets <- function(){
+    flag <- FALSE
     if(!all(c('availability_timestamp','available') %in% ls(envir = globalenv()))){
-        flag <- FALSE
         cat('\nPulling \'available\' tweets:data not found in env\n')
         available <<- search_tweets(q = "(oxygen OR bed) AND (verified OR available)", type = "recent",
                                     include_rts = FALSE,
@@ -136,10 +136,11 @@ find_best_response <- function(text){
 # broadcasting the tweet id range being used ------------------------------
 
 broadcast_stack <- function(range_start,range_stop,mode){
-    if(!(mode %in% c("RESERVING","RELEASING"))){
-        errorCondition("mode must be RESERVING or RELEASING")
+    if(!(mode %in% c("LOCK","UNLOCK"))){
+        errorCondition("mode must be LOCK or UNLOCK")
     }
-    text <- paste("STACK UPDATE",
+    cat('\n broadcasting range:',mode,"\t")
+    text <- paste("IGNORE THIS",
                   mode,
                   range_start,
                   range_stop,
@@ -154,31 +155,32 @@ broadcast_stack <- function(range_start,range_stop,mode){
 count_retires <- 0
 while(TRUE){
 
-    #snooze cycle: when its been less than an hour since last tweet
-    count_processed <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
-    while(count_processed > 0){
-        snooze_duration <- as.numeric(now(tz="Asia/Kolkata") - max(processed_tweets$time),units = "secs")+60
-        cat('\nSnoozing for ',as.character(snooze_duration %/% 60),' minutes to pass an hour since last post')
-        Sys.sleep(snooze_duration)
-        count_processed <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
-    }
-
-    if(update_request_tweets()){
-        broadcast_stack(range_start = min(requests$status_id),
-                        range_stop = max(requests$status_id),
-                        mode = "RESERVING")
-    }
-
     processed_tweets <- read_tsv("processed_tweets.tsv",
                                  col_types = cols(
                                      time = col_datetime(format =  "%Y-%m-%d %H:%M:%S"),
                                      status_id = col_character()
                                  )) %>% as.data.frame()
     processed_tweets$time <- force_tz(processed_tweets$time,tz = "Asia/Kolkata")
+
+    #snooze cycle: waiting for ~1 hour since last tweet to retry
+    count_posted <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
+    while(count_posted > 45){
+        snooze_duration <- as.numeric(max(processed_tweets$time) + 3600 - now(tz="Asia/Kolkata"),units = "secs")+60
+        cat('\nSnoozing for ',as.character(snooze_duration %/% 60),' minutes to pass an hour since last post')
+        Sys.sleep(snooze_duration)
+        count_posted <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
+    }
+
+    if(update_request_tweets()){
+        broadcast_stack(range_start = min(requests$status_id),
+                        range_stop = max(requests$status_id),
+                        mode = "LOCK")
+    }
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
-    #filter out reserved status id's here
+    #TODO add consensus filtering here
+
+    #setting up the while loop
     i <-  1
-    #switch count_posted to count_processed?
     count_posted <- 0
     time_posted <- c()
 
@@ -216,7 +218,7 @@ while(TRUE){
         cat('\nHit hourly posting limit\n')
         broadcast_stack(range_start = min(requests$status_id[i:nrow(requests)]),
                         range_stop = max(requests$status_id[i:nrow(requests)]),
-                        mode = "RELEASING")
+                        mode = "UNLOCK")
     }
     #alerting if requests are exhausted before posting limit; need to handle this case better
     if(i >= nrow(requests)){
