@@ -97,13 +97,18 @@ find_best_response <- function(text){
     }
     query_words <- c("bed",'icu',"ventilator",
                      "oxygen","refill","cylinder","concentrator")
+    strict_query_words <- c("icu","ventilator")
     avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,
                                                                              paste0('\\b',req_district,'\\b')))),]
     if(nrow(avail_loc) == 0){
         return(NA)
     }
     req_queries <- query_words[sapply(query_words,function(i) str_detect(text,i))]
-    scores <- avail_loc$text %>% sapply(function(i) sum(sapply(req_queries,function(j) str_detect(i,j))))
+    if(any(strict_query_words %in% req_queries)){
+        req_strict_queries <- strict_query_words[strict_query_words %in% req_queries]
+        avail_loc <- avail_loc[sapply(avail_loc$text,function(i) str_detect(i,strict_query_words)),]
+    }
+    scores <- avail_loc$text %>% sapply(function(i) sum(str_detect(i,req_queries)))
     if(all(scores == 0)){
         return(NA)
     }
@@ -146,8 +151,8 @@ broadcast_stack <- function(range_start,range_stop,mode){
                   range_stop,
                   "wrYeG7RAYeYM7WxuXyXM",
                   sep = ";")
-    post_tweet(status = text,
-               token = token)
+    # post_tweet(status = text,
+    #            token = token)
 }
 
 # the persistent code -----------------------------------------------------
@@ -200,6 +205,7 @@ while(TRUE){
         if(is.na(response)){
             i = i+1
         }else{
+            cat(as.character(count_posted+1),' ')
             post_tweet(status = response,
                        token = token,
                        in_reply_to_status_id = requests$status_id[i],
@@ -210,19 +216,21 @@ while(TRUE){
             count_posted <- count_posted + 1
             time_posted <- c(time_posted,now(tz="Asia/Kolkata"))
             count_retires <- 0
-            cat(as.character(count_posted),' ')
         }
     }
     #Making sure to release all unchecked
-    if(count_posted > 90){
-        cat('\nHit hourly posting limit\n')
-        broadcast_stack(range_start = min(requests$status_id[i:nrow(requests)]),
-                        range_stop = max(requests$status_id[i:nrow(requests)]),
+    if(count_posted >= 90){
+        cat('\nHit hourly posting limit ')
+        broadcast_stack(range_start = min(requests$status_id[i:nrow(requests)],na.rm = TRUE),
+                        range_stop = max(requests$status_id[i:nrow(requests)],na.rm = TRUE),
                         mode = "UNLOCK")
     }
     #alerting if requests are exhausted before posting limit; need to handle this case better
     if(i >= nrow(requests)){
-        cat('\nEntire request batch has been parsed\n')
+        cat('\nEntire request batch has been parsed ')
+        broadcast_stack(range_start = min(requests$status_id[i:nrow(requests)],na.rm = TRUE),
+                        range_stop = max(requests$status_id[i:nrow(requests)],na.rm = TRUE),
+                        mode = "UNLOCK")
         if(count_posted == 0){
             count_retires <- count_retires + 1
         }
