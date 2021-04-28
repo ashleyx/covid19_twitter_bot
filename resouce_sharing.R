@@ -83,6 +83,12 @@ update_available_tweets <- function(){
         flag <- TRUE
         availability_timestamp <<- now(tz="Asia/Kolkata")
     }
+    if(flag){
+        write_tsv(x = available %>%
+                      select(user_id:reply_count),
+                  file = paste0("~/work/twtbot/","twtdump_",
+                                                as.character(now(tzone = "Asia/Kolkata"))))
+    }
     return(flag)
 }
 
