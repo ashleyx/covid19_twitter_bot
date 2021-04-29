@@ -44,8 +44,8 @@ update_request_tweets <- function(){
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,2200km",
                                    n=1000,
-                                   parse = TRUE) %>% as.data.frame() %>%
-            arrange(created_at)
+                                   parse = TRUE) %>% as.data.frame() 
+    #%>%            arrange(created_at)
         flag <- TRUE
         request_timestamp <<- now(tz="Asia/Kolkata")
     }else if(as.numeric(now(tz="Asia/Kolkata")- request_timestamp, units = "mins") > 20){
@@ -54,8 +54,8 @@ update_request_tweets <- function(){
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,2200km",
                                    n=1000,
-                                   parse = TRUE) %>% as.data.frame() %>%
-            arrange(created_at)
+                                   parse = TRUE) %>% as.data.frame()
+    #%>%            arrange(created_at)
         flag <- TRUE
         request_timestamp <<- now(tz="Asia/Kolkata")
     }
