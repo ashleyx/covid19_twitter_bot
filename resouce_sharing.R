@@ -8,6 +8,10 @@ invisible(sapply(libraries, function(i){
 },USE.NAMES = FALSE) )
 
 
+hourly_tweet_limit <- 95
+
+
+# location matching things ------------------------------------------------
 
 district_data <- read_tsv("GADM.tsv",
                           col_types = cols(
@@ -44,7 +48,7 @@ update_request_tweets <- function(){
                                    include_rts = FALSE,
                                    geocode = "21.0,78.0,2200km",
                                    n=1000,
-                                   parse = TRUE) %>% as.data.frame() 
+                                   parse = TRUE) %>% as.data.frame()
     #%>%            arrange(created_at)
         flag <- TRUE
         request_timestamp <<- now(tz="Asia/Kolkata")
@@ -102,7 +106,8 @@ find_best_response <- function(text){
         return(NA)
     }
     query_words <- c("bed",'icu',"ventilator",
-                     "oxygen","refill","cylinder","concentrator")
+                     "oxygen","refill","cylinder","concentrator",
+                     "oxygen kit")
     strict_query_words <- c("icu","ventilator")
     avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,
                                                                              paste0('\\b',req_district,'\\b')))),]
@@ -115,7 +120,7 @@ find_best_response <- function(text){
         avail_loc <- avail_loc[sapply(avail_loc$text,function(i) str_detect(i,strict_query_words)),]
     }
     scores <- avail_loc$text %>% sapply(function(i) sum(str_detect(i,req_queries)))
-    if(all(scores == 0)){
+    if(all(scores == 0,na.rm = TRUE)){
         return(NA)
     }
     avail_loc$text %<>% tolower()
@@ -126,39 +131,69 @@ find_best_response <- function(text){
     if(is.na(avail_loc$user_id[1]) | is.na(avail_loc$user_id[1])){
         return(NA)
     }
+
+    search_link <- paste0("https://twitter.com/search?q=",
+                          "(\"",
+                          paste0(req_district,collapse = "\"%20OR%20\""),
+                          "\")")
+    if(any(strict_query_words %in% req_queries)){ #strict matching for strict_queries
+        search_link <- paste0(search_link,
+                              "%20AND%20(\"",
+                              paste0(req_strict_queries,collapse = "\"%20AND%20\""),
+                              "\")")
+    }
+    req_queries <- req_queries[!(req_queries %in% strict_query_words)]
+    if(length(req_queries)>0){ # relaxed matching for regular query words
+        search_link <- paste0(search_link,
+                              "%20AND%20(\"",
+                              paste0(req_queries,collapse = "\"%20OR%20\""),
+                              "\")")
+    }
+    search_link <- paste0(search_link,"&f=live")#sort by latest
+
     link <- paste0("https://twitter.com/",
-                   avail_loc$user_id[1],
+                   avail_loc$user_id[1:min(nrow(avail_loc),3)],
                    "/status/",
-                   avail_loc$status_id[1])
-    response <- paste0("Recent tweet found for '",
+                   avail_loc$status_id[1:min(nrow(avail_loc), 3)], collapse = '\n')
+    response <- paste0("Recent tweets for '",
                        paste0(req_queries,collapse ="/"),
                        "' at '",
                        paste0(req_district,collapse = "/"),
                        "' : \n ",
                        link)
-    if(nchar(response) <= 280){
-        return(response)
-    }else{
-        return(link)
+    if(nchar(response) >= 280){
+        link <- paste0("https://twitter.com/",
+                       avail_loc$user_id[1:min(nrow(avail_loc), 2)],
+                       "/status/",
+                       avail_loc$status_id[1:min(nrow(avail_loc), 2)], collapse = '\n')
+        response <- paste0("Recent tweets for '",
+                           paste0(req_queries,collapse ="/"),
+                           "' at '",
+                           paste0(req_district,collapse = "/"),
+                           "' : \n ",
+                           link)
     }
-}
+    post_tweet(status = response,
+               token = token,
+               in_reply_to_status_id = requests$status_id[i],
+               auto_populate_reply_metadata = TRUE)
+    write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
+          "processed_tweets.tsv",append = TRUE)
 
+    search_response <- paste0("A twitter search link for '",
+                              paste0(req_queries,collapse ="/"),
+                              "' at '",
+                              paste0(req_district,collapse = "/"),
+                              "' : \n ",
+                              search_link)
+    post_tweet(status = search_response,
+               token = token,
+               in_reply_to_status_id = requests$status_id[i],
+               auto_populate_reply_metadata = TRUE)
 
-# broadcasting the tweet id range being used ------------------------------
-
-broadcast_stack <- function(range_start,range_stop,mode){
-    if(!(mode %in% c("LOCK","UNLOCK"))){
-        errorCondition("mode must be LOCK or UNLOCK")
-    }
-    cat('\n broadcasting range:',mode,"\t")
-    text <- paste("IGNORE THIS",
-                  mode,
-                  range_start,
-                  range_stop,
-                  "wrYeG7RAYeYM7WxuXyXM",
-                  sep = ";")
-    # post_tweet(status = text,
-    #            token = token)
+    write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
+          "processed_tweets.tsv",append = TRUE)
+    return(2)
 }
 
 # the persistent code -----------------------------------------------------
@@ -175,27 +210,23 @@ while(TRUE){
 
     #snooze cycle: waiting for ~1 hour since last tweet to retry
     count_posted <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
-    while(count_posted > 45){
+    while(count_posted > (hourly_tweet_limit/2)){
         snooze_duration <- as.numeric(max(processed_tweets$time) + 3600 - now(tz="Asia/Kolkata"),units = "secs")+60
-        cat('\nSnoozing for ',as.character(snooze_duration %/% 60),' minutes to pass an hour since last post')
+        cat('\nSnoozing for ',as.character(snooze_duration %/% 60)/4,' minutes to stay under hourly posting limit')
         Sys.sleep(snooze_duration)
         count_posted <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
     }
 
-    if(update_request_tweets()){
-        broadcast_stack(range_start = min(requests$status_id),
-                        range_stop = max(requests$status_id),
-                        mode = "LOCK")
-    }
+    update_request_tweets()
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
     #TODO add consensus filtering here
 
     #setting up the while loop
     i <-  1
-    count_posted <- 0
-    time_posted <- c()
+    count_posted <- sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
+    time_posted <- processed_tweets$time[as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60]
 
-    while(count_posted <= 90 & i <= nrow(requests)){
+    while(count_posted <= hourly_tweet_limit & i <= nrow(requests)){
         update_available_tweets()
 
         count_posted <- count_posted - sum( as.numeric(now(tz="Asia/Kolkata") - time_posted, units = "mins") > 60)
@@ -206,37 +237,25 @@ while(TRUE){
             response <- find_best_response(requests$text[i])
             },
             error = function(e){
+                print(e)
                 response <- NA
             })
         if(is.na(response)){
             i = i+1
         }else{
-            cat(as.character(count_posted+1),' ')
-            post_tweet(status = response,
-                       token = token,
-                       in_reply_to_status_id = requests$status_id[i],
-                       auto_populate_reply_metadata = TRUE)
-            write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
-                  "processed_tweets.tsv",append = TRUE)
             i <- i+1
-            count_posted <- count_posted + 1
-            time_posted <- c(time_posted,now(tz="Asia/Kolkata"))
+            count_posted <- count_posted + response
+            time_posted <- c(time_posted,rep(now(tz="Asia/Kolkata"),response))
             count_retires <- 0
         }
     }
     #Making sure to release all unchecked
-    if(count_posted >= 90){
+    if(count_posted >= hourly_tweet_limit){
         cat('\nHit hourly posting limit ')
-        broadcast_stack(range_start = min(requests$status_id[i:nrow(requests)],na.rm = TRUE),
-                        range_stop = max(requests$status_id[i:nrow(requests)],na.rm = TRUE),
-                        mode = "UNLOCK")
     }
     #alerting if requests are exhausted before posting limit; need to handle this case better
     if(i >= nrow(requests)){
         cat('\nEntire request batch has been parsed ')
-        broadcast_stack(range_start = min(requests$status_id[i:nrow(requests)],na.rm = TRUE),
-                        range_stop = max(requests$status_id[i:nrow(requests)],na.rm = TRUE),
-                        mode = "UNLOCK")
         if(count_posted == 0){
             count_retires <- count_retires + 1
         }
