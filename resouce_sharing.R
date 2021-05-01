@@ -133,23 +133,24 @@ find_best_response <- function(text){
     }
 
     search_link <- paste0("https://twitter.com/search?q=",
-                          "(\"",
-                          paste0(req_district,collapse = "\"%20OR%20\""),
-                          "\")")
+                          "%28%22",
+                          paste0(req_district,collapse = "%22%20OR%20%22"),
+                          "%22%29")
+    req_strict_queries <- strict_query_words[strict_query_words %in% req_queries]
     if(any(strict_query_words %in% req_queries)){ #strict matching for strict_queries
         search_link <- paste0(search_link,
-                              "%20AND%20(\"",
-                              paste0(req_strict_queries,collapse = "\"%20AND%20\""),
-                              "\")")
+                              "%20AND%20%28%22",
+                              paste0(req_strict_queries,collapse = "%22%20AND%20%22"),
+                              "%22%29")
     }
     req_queries <- req_queries[!(req_queries %in% strict_query_words)]
     if(length(req_queries)>0){ # relaxed matching for regular query words
         search_link <- paste0(search_link,
-                              "%20AND%20(\"",
-                              paste0(req_queries,collapse = "\"%20OR%20\""),
-                              "\")")
+                              "%20AND%20%28%22",
+                              paste0(req_queries,collapse = "%22%20OR%20%22"),
+                              "%22%29")
     }
-    search_link <- paste0(search_link,"&f=live")#sort by latest
+    search_link <- paste0(search_link,"%20AND%20%22available%22&f=live")#sort by latest
 
     link <- paste0("https://twitter.com/",
                    avail_loc$user_id[1:min(nrow(avail_loc),3)],
