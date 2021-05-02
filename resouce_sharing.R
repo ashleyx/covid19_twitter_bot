@@ -40,6 +40,19 @@ token <- create_token(
 
 
 # database update functions -----------------------------------------------
+
+retry_on_fail <- function(fx){
+    flag <- TRUE
+    while(flag){
+        tryCatch(expr = {
+            fx()
+            flag <- FALSE
+        },error = function(e){
+            print(e)
+            Sys.sleep(60)
+        })}
+}
+
 update_request_tweets <- function(){
     flag <- FALSE
     if(!all(c('request_timestamp','requests') %in% ls(envir = globalenv()))){
@@ -143,15 +156,15 @@ find_best_response <- function(text){
                               paste0(req_strict_queries,collapse = "%22%20AND%20%22"),
                               "%22%29")
     }
-    req_queries <- req_queries[!(req_queries %in% strict_query_words)]
-    if(length(req_queries)>0){ # relaxed matching for regular query words
+    req_queries_alt <- req_queries[!(req_queries %in% strict_query_words)]
+    if(length(req_queries_alt)>0){ # relaxed matching for regular query words
         search_link <- paste0(search_link,
                               "%20AND%20%28%22",
-                              paste0(req_queries,collapse = "%22%20OR%20%22"),
+                              paste0(req_queries_alt,collapse = "%22%20OR%20%22"),
                               "%22%29")
     }
     search_link <- paste0(search_link,"%20AND%20%22available%22&f=live")#sort by latest
-
+    search_link <- str_replace_all(search_link,"\\s","%20")
     link <- paste0("https://twitter.com/",
                    avail_loc$user_id[1:min(nrow(avail_loc),3)],
                    "/status/",
@@ -185,8 +198,9 @@ find_best_response <- function(text){
                               paste0(req_queries,collapse ="/"),
                               "' at '",
                               paste0(req_district,collapse = "/"),
-                              "' : \n ",
-                              search_link)
+                              "':\n ",
+                              search_link,
+                              "\n on mobile switch to Latest tab to sort by new.")
     post_tweet(status = search_response,
                token = token,
                in_reply_to_status_id = requests$status_id[i],
@@ -213,12 +227,12 @@ while(TRUE){
     count_posted <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
     while(count_posted > (hourly_tweet_limit/2)){
         snooze_duration <- as.numeric(max(processed_tweets$time) + 3600 - now(tz="Asia/Kolkata"),units = "secs")+60
-        cat('\nSnoozing for ',as.character(snooze_duration %/% 60)/4,' minutes to stay under hourly posting limit')
+        cat('\nSnoozing for ',as.character(snooze_duration %/% 60),' minutes to stay under hourly posting limit')
         Sys.sleep(snooze_duration)
         count_posted <-  sum(as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60)
     }
 
-    update_request_tweets()
+    retry_on_fail(update_request_tweets)
     requests %<>% filter(!(status_id %in% processed_tweets$status_id))
     #TODO add consensus filtering here
 
@@ -228,7 +242,7 @@ while(TRUE){
     time_posted <- processed_tweets$time[as.numeric(now(tz="Asia/Kolkata") - processed_tweets$time,units = "mins") < 60]
 
     while(count_posted <= hourly_tweet_limit & i <= nrow(requests)){
-        update_available_tweets()
+        retry_on_fail(update_available_tweets)
 
         count_posted <- count_posted - sum( as.numeric(now(tz="Asia/Kolkata") - time_posted, units = "mins") > 60)
         time_posted <- time_posted[as.numeric(now(tz="Asia/Kolkata") - time_posted,units = "mins") < 60]
