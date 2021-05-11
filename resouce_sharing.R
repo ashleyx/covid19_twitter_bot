@@ -1,3 +1,5 @@
+# loading packages/libraries ----------------------------------------------
+
 libraries <- c('rtweet','magrittr','readr','stringr','dplyr','lubridate')
 if(!all(libraries %in% rownames(installed.packages()))){
     install.packages(libraries)
@@ -8,6 +10,10 @@ invisible(sapply(libraries, function(i){
 },USE.NAMES = FALSE) )
 
 
+
+# top level switches and knobs ---------------------------------------------
+
+dry_run <- FALSE
 hourly_tweet_limit <- 95
 
 
@@ -62,7 +68,7 @@ update_request_tweets <- function(){
                                    geocode = "21.0,78.0,2200km",
                                    n=1000,
                                    parse = TRUE) %>% as.data.frame()
-    #%>%            arrange(created_at)
+        #%>%            arrange(created_at)
         flag <- TRUE
         request_timestamp <<- now(tz="Asia/Kolkata")
     }else if(as.numeric(now(tz="Asia/Kolkata")- request_timestamp, units = "mins") > 20){
@@ -72,7 +78,7 @@ update_request_tweets <- function(){
                                    geocode = "21.0,78.0,2200km",
                                    n=1000,
                                    parse = TRUE) %>% as.data.frame()
-    #%>%            arrange(created_at)
+        #%>%            arrange(created_at)
         flag <- TRUE
         request_timestamp <<- now(tz="Asia/Kolkata")
     }
@@ -104,7 +110,7 @@ update_available_tweets <- function(){
         write_tsv(x = available %>%
                       select(user_id:reply_count),
                   file = paste0("~/work/twtbot/","twtdump_",
-                                                as.character(now(tzone = "Asia/Kolkata"))))
+                                as.character(now(tzone = "Asia/Kolkata"))))
     }
     return(flag)
 }
@@ -113,15 +119,21 @@ update_available_tweets <- function(){
 # processing request tweets -----------------------------------------------
 
 find_best_response <- function(text){
+    tweet_post_count <- 0
+    query_words <- c("bed",'icu',"ventilator",
+                     "oxygen","refill","cylinder","concentrator",
+                     "oxygen kit")
+    strict_query_words <- c("icu","ventilator")
+    if(any(str_detect(text,c("plasma","tocilizumab",
+                             "remdesivir","remdisivir")))){
+        return(NA)
+    }
+
     text <- tolower(text)
     req_district <- str_extract_all(text,district_pattern)[[1]] %>% unique()
     if(length(req_district) == 0){
         return(NA)
     }
-    query_words <- c("bed",'icu',"ventilator",
-                     "oxygen","refill","cylinder","concentrator",
-                     "oxygen kit")
-    strict_query_words <- c("icu","ventilator")
     avail_loc <- available[sapply(available$text, function(i) any(str_detect(i,
                                                                              paste0('\\b',req_district,'\\b')))),]
     if(nrow(avail_loc) == 0){
@@ -165,53 +177,61 @@ find_best_response <- function(text){
     }
     search_link <- paste0(search_link,"%20AND%20%22available%22&f=live")#sort by latest
     search_link <- str_replace_all(search_link,"\\s","%20")
-    link <- paste0("https://twitter.com/",
-                   avail_loc$user_id[1:min(nrow(avail_loc),3)],
-                   "/status/",
-                   avail_loc$status_id[1:min(nrow(avail_loc), 3)], collapse = '\n')
-    response <- paste0("Recent tweets for '",
-                       paste0(req_queries,collapse ="/"),
-                       "' at '",
-                       paste0(req_district,collapse = "/"),
-                       "' : \n ",
-                       link)
-    if(nchar(response) >= 280){
-        link <- paste0("https://twitter.com/",
-                       avail_loc$user_id[1:min(nrow(avail_loc), 2)],
-                       "/status/",
-                       avail_loc$status_id[1:min(nrow(avail_loc), 2)], collapse = '\n')
-        response <- paste0("Recent tweets for '",
-                           paste0(req_queries,collapse ="/"),
-                           "' at '",
-                           paste0(req_district,collapse = "/"),
-                           "' : \n ",
-                           link)
-    }
-    post_tweet(status = response,
-               token = token,
-               in_reply_to_status_id = requests$status_id[i],
-               auto_populate_reply_metadata = TRUE)
-    write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
-          "processed_tweets.tsv",append = TRUE)
+    # link <- paste0("https://twitter.com/",
+    #                avail_loc$user_id[1:min(nrow(avail_loc),3)],
+    #                "/status/",
+    #                avail_loc$status_id[1:min(nrow(avail_loc), 3)], collapse = '\n')
+    # response <- paste0("Recent tweets for '",
+    #                    paste0(req_queries,collapse ="/"),
+    #                    "' at '",
+    #                    paste0(req_district,collapse = "/"),
+    #                    "' : \n ",
+    #                    link)
+    # if(nchar(response) >= 280){
+    #     link <- paste0("https://twitter.com/",
+    #                    avail_loc$user_id[1:min(nrow(avail_loc), 2)],
+    #                    "/status/",
+    #                    avail_loc$status_id[1:min(nrow(avail_loc), 2)], collapse = '\n')
+    #     response <- paste0("Recent tweets for '",
+    #                        paste0(req_queries,collapse ="/"),
+    #                        "' at '",
+    #                        paste0(req_district,collapse = "/"),
+    #                        "' : \n ",
+    #                        link)
+    # }
+    # post_tweet(status = response,
+    #            token = token,
+    #            in_reply_to_status_id = requests$status_id[i],
+    #            auto_populate_reply_metadata = TRUE)
+    # write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
+    #       "processed_tweets.tsv",append = TRUE)
+    # tweet_post_count <- tweet_post_count +1
 
-    search_response <- paste0("A twitter search link for '",
+    search_response <- paste0("A twitter search link using '",
                               paste0(req_queries,collapse ="/"),
                               "' at '",
                               paste0(req_district,collapse = "/"),
-                              "':\n ",
+                              "' is : ",
                               search_link,
-                              "\n on mobile switch to Latest tab to sort by new.")
-    post_tweet(status = search_response,
-               token = token,
-               in_reply_to_status_id = requests$status_id[i],
-               auto_populate_reply_metadata = TRUE)
+                              "\nOn mobile switch to Latest tab to sort by new.",
+                              "\n")
 
-    write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
-          "processed_tweets.tsv",append = TRUE)
-    return(2)
+    if(not(dry_run)){
+
+        post_tweet(status = search_response,
+                   token = token,
+                   in_reply_to_status_id = requests$status_id[i],
+                   auto_populate_reply_metadata = TRUE)
+        write(paste0(now(tz="Asia/Kolkata"),"\t",requests$status_id[i]),
+              "processed_tweets.tsv",append = TRUE)
+        tweet_post_count <- tweet_post_count +1
+
+    }
+
+    return(tweet_post_count)
 }
 
-# the persistent code -----------------------------------------------------
+# the persistently running code -----------------------------------------------------
 
 count_retires <- 0
 while(TRUE){
@@ -250,11 +270,11 @@ while(TRUE){
         #finding and posting a response
         tryCatch(expr = {
             response <- find_best_response(requests$text[i])
-            },
-            error = function(e){
-                print(e)
-                response <- NA
-            })
+        },
+        error = function(e){
+            print(e)
+            response <- NA
+        })
         if(is.na(response)){
             i = i+1
         }else{
@@ -264,18 +284,17 @@ while(TRUE){
             count_retires <- 0
         }
     }
-    #Making sure to release all unchecked
-    if(count_posted >= hourly_tweet_limit){
+
+    if(count_posted >= hourly_tweet_limit){ #This doesnt really serve a purpose
         cat('\nHit hourly posting limit ')
     }
+
     #alerting if requests are exhausted before posting limit; need to handle this case better
     if(i >= nrow(requests)){
         cat('\nEntire request batch has been parsed ')
-        if(count_posted == 0){
-            count_retires <- count_retires + 1
-        }
+        count_retires <- count_retires + 1
     }
-    #snooze cycle 2: nothing to do
+
     if(count_retires >= 3){
         cat('\nFound nothing to do in multiple retries, snoozing for 5 mins and retrying\n')
         Sys.sleep(300)
